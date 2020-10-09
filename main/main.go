@@ -10,6 +10,9 @@ import (
     "os/exec"
     "io/ioutil"
     "encoding/json"
+	"time"
+	"github.com/sirupsen/logrus"
+	"regexp"
 )
 
 func ConfigLocalFileSystemLogger(logPath string, logFileName string, maxAge time.Duration, rotationTime time.Duration) {
@@ -66,13 +69,16 @@ func ReadConfigFile(confFile string) bool {
 		logrus.Error("ioutil ReadAll failed.")
 		return false
 	}
-	
+	strContent := string(contents)
+	re := regexp.MustCompile("\\n")
+	strContent = re.ReplaceAllString(strContent, "")
+
 	defer conf.Close()
 	
 	if jsonContent != nil {
 		jsonContent = make(map[string]interface{})
 	}
-	err = json.Unmarshal(contents, &jsonContent)
+	err = json.Unmarshal([]byte(strContent), &jsonContent)
 	if err != nil {
 		logrus.Errorf("json格式化配置文件内容失败，错误描述：%s", err.Error())
 		return false
