@@ -13,6 +13,7 @@ import (
 	"time"
 	"github.com/sirupsen/logrus"
 	"regexp"
+	"runtime"
 )
 
 func ConfigLocalFileSystemLogger(logPath string, logFileName string, maxAge time.Duration, rotationTime time.Duration) {
@@ -89,9 +90,18 @@ func ReadConfigFile(confFile string) bool {
 }
 
 func main() {
+	sysType := runtime.GOOS
+	fmt.Println("sysType:", sysType)
+	bWindows := false
+	bLinux := false
+	if sysType == "windows" {
+		bWindows = true
+	} else if sysType == "linux" {
+		bLinux = true
+	}
 	absDir, err := os.Getwd()
 	if err != nil {
-		fmt.Println("获取程序工作目录失败，错误描述：%s", err.Error())
+		fmt.Println("获取程序工作目录失败，错误描述：" + err.Error())
 		return
 	}
 	logDir := absDir + "/log"
@@ -127,36 +137,74 @@ func main() {
 			g_configFileModifyTime = confinfo.ModTime()
 		}
 		
-		for key, val := range jsonContent {
-			command := fmt.Sprintf("ps ax|grep -v 'grep'|grep '%s'|awk '{print $1}'", key)
-			logrus.Infof("command:%s", command)
-			out, err := exec.Command("/bin/sh", "-c", command).CombinedOutput()
-			if err != nil {
-				logrus.Errorf("执行命令：%s失败，错误描述：%s", command, err.Error())
-				continue
-			}
-			
-			for i := 0; i < len(out); i++ {
-				if out[i] == '\n' {
-					out = out[:i]
-					break
-				}
-			}
-			
-			appname := fmt.Sprintf("%s/%s", val.(string), key)
-			logrus.Infof("pid:[%s] | Application:[%s]", string(out), appname)
-			
-			if string(out) == "" {
-				err = os.Chdir(val.(string))
+		if bLinux {
+			for key, val := range jsonContent {
+				command := fmt.Sprintf("ps ax|grep -v 'grep'|grep '%s'|awk '{print $1}'", key)
+				logrus.Infof("command:%s", command)
+				out, err := exec.Command("/bin/sh", "-c", command).CombinedOutput()
 				if err != nil {
-					logrus.Errorf("切换到目录：%s失败", val.(string))
+					logrus.Errorf("执行命令：%s失败，错误描述：%s", command, err.Error())
 					continue
 				}
-				cmd := exec.Command(appname)
-				err = cmd.Start()
-				if err != nil {
-					logrus.Errorf("唤起程序：%s失败，错误描述：%s", appname, err.Error())
-					break
+				
+				for i := 0; i < len(out); i++ {
+					if out[i] == '\n' {
+						out = out[:i]
+						break
+					}
+				}
+				
+				appname := fmt.Sprintf("%s/%s", val.(string), key)
+				logrus.Infof("pid:[%s] | Application:[%s]", string(out), appname)
+				
+				if string(out) == "" {
+					err = os.Chdir(val.(string))
+					if err != nil {
+						logrus.Errorf("切换到目录：%s失败", val.(string))
+						continue
+					}
+					cmd := exec.Command(appname)
+					err = cmd.Start()
+					if err != nil {
+						logrus.Errorf("唤起程序：%s失败，错误描述：%s", appname, err.Error())
+						break
+					}
+				}
+			}
+		}
+		if bWindows {
+			//
+			for key, val := range jsonContent {
+				command := fmt.Sprintf("tasklist|findstr %s", key)
+				logrus.Infof("command:%s", command)
+				out, err := exec.Command("cmd", "/c", command).CombinedOutput()
+				// if err != nil {
+				// 	logrus.Errorf("执行命令：%s失败，错误描述：%s", command, err.Error())
+				// 	continue
+				// }
+				
+				for i := 0; i < len(out); i++ {
+					if out[i] == '\n' {
+						out = out[:i]
+						break
+					}
+				}
+				
+				appname := fmt.Sprintf("%s/%s", val.(string), key)
+				logrus.Infof("pid:[%s] | Application:[%s]", string(out), appname)
+				
+				if string(out) == "" {
+					err = os.Chdir(val.(string))
+					if err != nil {
+						logrus.Errorf("切换到目录：%s失败", val.(string))
+						continue
+					}
+					cmd := exec.Command(appname)
+					err = cmd.Start()
+					if err != nil {
+						logrus.Errorf("唤起程序：%s失败，错误描述：%s", appname, err.Error())
+						break
+					}
 				}
 			}
 		}
