@@ -1,0 +1,5 @@
+main.exe
+log/*
+main/main.exe
+main/conf/*
+*.exe
