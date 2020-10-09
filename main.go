@@ -129,12 +129,16 @@ func main() {
 		if err != nil && os.IsNotExist(err) {
 			logrus.Errorf("配置文件：%s不存在。", confFile)
 		} else {
-			logrus.Warnf("配置文件：%s被修改。", confFile)
-			if !ReadConfigFile(confFile) {
-				logrus.Error("读取配置文件失败")
-				return
+			modifyTime := confinfo.ModTime()
+			if modifyTime != g_configFileModifyTime {
+				logrus.Warnf("配置文件：%s被修改。", confFile)
+				if !ReadConfigFile(confFile) {
+					logrus.Error("读取配置文件失败")
+					return
+				}
+				g_configFileModifyTime = confinfo.ModTime()
+				logrus.Infof("修改时间:%s", g_configFileModifyTime)
 			}
-			g_configFileModifyTime = confinfo.ModTime()
 		}
 		
 		if bLinux {
@@ -182,6 +186,9 @@ func main() {
 				// 	logrus.Errorf("执行命令：%s失败，错误描述：%s", command, err.Error())
 				// 	continue
 				// }
+				if err != nil {
+					logrus.Infof("执行命令：%s结果：%s", command, err.Error())
+				}
 				
 				for i := 0; i < len(out); i++ {
 					if out[i] == '\n' {
